@@ -454,3 +454,14 @@ body {
   color: var(--muted);
   line-height: 1.45;
 }
+
+.hist-card .leave-form .correct-field {
+  margin-top: 0.35rem;
+}
+
+.hist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}

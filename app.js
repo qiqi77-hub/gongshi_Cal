@@ -88,11 +88,12 @@
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   }
 
-  /** 本年按周统计的起始：本周一 0:00（不含更早的周，例如上周） */
+  /** 本年按周：从当年 1 月 1 日起纳入（补录上周及更早的周也会进表，只要该年有打卡） */
   function getYearStatsCutoffMonday(anchorDate) {
-    var thisMon = mondayOfSameWeek(anchorDate);
-    thisMon.setHours(0, 0, 0, 0);
-    return thisMon;
+    var y = anchorDate.getFullYear();
+    var start = new Date(y, 0, 1);
+    start.setHours(0, 0, 0, 0);
+    return start;
   }
 
   function formatHoursMinutes(ms) {
@@ -322,6 +323,11 @@
   var elCorrectIn = document.getElementById("correctIn");
   var elCorrectOut = document.getElementById("correctOut");
   var elBtnApplyCorrect = document.getElementById("btnApplyCorrect");
+  var elHistoricalDate = document.getElementById("historicalDate");
+  var elHistoricalIn = document.getElementById("historicalIn");
+  var elHistoricalOut = document.getElementById("historicalOut");
+  var elBtnSaveHistorical = document.getElementById("btnSaveHistorical");
+  var elBtnClearHistorical = document.getElementById("btnClearHistorical");
 
   function todayYMD() {
     return toYMD(new Date());
@@ -354,6 +360,7 @@
     if (elUserEmail) elUserEmail.textContent = (currentUser && currentUser.email) || "";
     updateSyncFooter();
     render();
+    fillHistoricalFormFromSelection();
   }
 
   function showAuthUi() {
@@ -582,6 +589,76 @@
     return true;
   }
 
+  function fillHistoricalFormFromSelection() {
+    if (!elHistoricalDate || !elHistoricalIn || !elHistoricalOut) return;
+    var ymd = elHistoricalDate.value;
+    if (!ymd) {
+      elHistoricalIn.value = "";
+      elHistoricalOut.value = "";
+      return;
+    }
+    var rec = (state.days && state.days[ymd]) || {};
+    elHistoricalIn.value = rec.clockIn ? hmFromIso(rec.clockIn) : "";
+    elHistoricalOut.value = rec.clockOut ? hmFromIso(rec.clockOut) : "";
+  }
+
+  function saveHistoricalDay() {
+    var ymd = elHistoricalDate && elHistoricalDate.value;
+    var inHm = elHistoricalIn ? elHistoricalIn.value : "";
+    var outHm = elHistoricalOut ? elHistoricalOut.value : "";
+    if (!ymd) {
+      alert("请选择日期");
+      return;
+    }
+    if (!inHm || !outHm) {
+      alert("请填写上班与下班时间");
+      return;
+    }
+    var inIso = isoFromYmdHM(ymd, inHm);
+    var outIso = isoFromYmdHM(ymd, outHm);
+    if (!inIso || !outIso) {
+      alert("时间格式无效");
+      return;
+    }
+    if (new Date(outIso) <= new Date(inIso)) {
+      alert("下班时间须晚于上班时间");
+      return;
+    }
+    if (!isWeekday(parseYMD(ymd))) {
+      if (!confirm("该日为周末，保存后不会计入本周/本年按周统计，确定保存？")) return;
+    }
+    if (!state.days[ymd]) state.days[ymd] = {};
+    var rec = state.days[ymd];
+    rec.clockIn = inIso;
+    rec.clockOut = outIso;
+    rec.punchedInAt = inIso;
+    var today = todayYMD();
+    if (ymd === today) {
+      if (!state.meta) state.meta = {};
+      state.meta.lastClockInAt = inIso;
+    }
+    saveState(state);
+    render();
+    fillHistoricalFormFromSelection();
+  }
+
+  function clearHistoricalDay() {
+    var ymd = elHistoricalDate && elHistoricalDate.value;
+    if (!ymd) {
+      alert("请先选择日期");
+      return;
+    }
+    if (!state.days[ymd] || (!state.days[ymd].clockIn && !state.days[ymd].clockOut)) {
+      alert("该日暂无打卡记录");
+      return;
+    }
+    if (!confirm("确定删除 " + ymd + " 的打卡记录？")) return;
+    delete state.days[ymd];
+    saveState(state);
+    render();
+    fillHistoricalFormFromSelection();
+  }
+
   if (elBtnApplyCorrect) {
     elBtnApplyCorrect.addEventListener("click", function (e) {
       if (e && e.preventDefault) e.preventDefault();
@@ -592,6 +669,22 @@
         return;
       }
       applyTodayTimesFromHM(inHm || null, outHm || null);
+    });
+  }
+
+  if (elHistoricalDate) {
+    elHistoricalDate.addEventListener("change", fillHistoricalFormFromSelection);
+  }
+  if (elBtnSaveHistorical) {
+    elBtnSaveHistorical.addEventListener("click", function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      saveHistoricalDay();
+    });
+  }
+  if (elBtnClearHistorical) {
+    elBtnClearHistorical.addEventListener("click", function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      clearHistoricalDay();
     });
   }
 
@@ -624,6 +717,13 @@
 
   (function initLeaveDate() {
     elLeaveDate.value = todayYMD();
+  })();
+
+  (function initHistoricalDate() {
+    if (!elHistoricalDate) return;
+    var d = new Date();
+    d.setDate(d.getDate() - 1);
+    elHistoricalDate.value = toYMD(d);
   })();
 
   if (elBtnAuthLogin) {

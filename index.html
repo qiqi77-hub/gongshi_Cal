@@ -86,6 +86,31 @@
             </div>
           </section>
 
+          <section class="card hist-card">
+            <h2>补录历史打卡</h2>
+            <p class="hint">
+              选择日期并填<strong>上班、下班</strong>时间后保存即可。统计按<strong>自然周</strong>归类；仅<strong>工作日</strong>进入本周与本年表，周末可保存但不计入表。补录<strong>今年内任意工作日</strong>后，对应周会出现在下方「本年按周」表中。
+            </p>
+            <div class="leave-form">
+              <label class="field">
+                <span>日期</span>
+                <input type="date" id="historicalDate" />
+              </label>
+              <label class="correct-field">
+                <span>上班</span>
+                <input type="time" id="historicalIn" />
+              </label>
+              <label class="correct-field">
+                <span>下班</span>
+                <input type="time" id="historicalOut" />
+              </label>
+              <div class="hist-actions">
+                <button type="button" class="btn btn-primary" id="btnSaveHistorical">保存该日打卡</button>
+                <button type="button" class="btn btn-ghost" id="btnClearHistorical">删除该日记录</button>
+              </div>
+            </div>
+          </section>
+
           <section class="card stats-card">
             <h2>本周</h2>
             <div class="stat-row">
@@ -104,13 +129,12 @@
           <section class="card stats-card">
             <h2>本年按周</h2>
             <div class="stat-row">
-              <span class="stat-label">本年日均（本周起，按实际出勤天）</span>
+              <span class="stat-label">本年日均（自然年，按实际出勤天）</span>
               <span class="stat-value" id="yearWeekAvg">—</span>
             </div>
             <p class="hint">
-              自<strong>本周一</strong>起：总工时 ÷
-              <strong>所有「已完整打卡」的工作日天数</strong>（与本周分母规则相同）。下表「出勤天」为每周打卡天数，「周日均」=
-              该周总工时 ÷ 该周出勤天。
+              <strong>今年 1 月 1 日</strong>起至<strong>本周</strong>：有完整打卡的周会出现在下表；总工时 ÷
+              <strong>这些周里所有「已完整打卡」的工作日天数</strong>（与本周分母规则相同）。「出勤天」「周日均」按周计算；不展示未到本周的<strong>未来周</strong>。
             </p>
             <div class="year-weeks-wrap">
               <table class="week-table" id="yearWeekTable">
