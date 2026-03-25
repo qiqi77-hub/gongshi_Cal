@@ -2,7 +2,6 @@
   "use strict";
 
   var STORAGE_KEY = "worktime-calculator-v1";
-  var MIGRATION_PREFILL_KEY = "worktime-migration-v4-prefill";
 
   function pad2(n) {
     return (n < 10 ? "0" : "") + n;
@@ -89,42 +88,11 @@
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   }
 
-  /** 本年按周统计的起始：上周一 0:00（含当天） */
+  /** 本年按周统计的起始：本周一 0:00（不含更早的周，例如上周） */
   function getYearStatsCutoffMonday(anchorDate) {
     var thisMon = mondayOfSameWeek(anchorDate);
-    var cut = new Date(thisMon);
-    cut.setDate(thisMon.getDate() - 7);
-    cut.setHours(0, 0, 0, 0);
-    return cut;
-  }
-
-  var DEFAULT_MORNING_H = 9;
-  var DEFAULT_MORNING_M = 21;
-
-  /**
-   * 同一天内傍晚误点「上班」：上下班均在 18:00 后且间隔 ≤3 小时 → 将上班时间改为当日 9:21（仅改 clockIn，不动 punchedInAt）
-   */
-  function fixEveningMisclickClockIn(state, anchorDate) {
-    var ymd = toYMD(anchorDate);
-    var rec = state.days[ymd];
-    if (!rec || !rec.clockIn || !rec.clockOut) return false;
-    var start = new Date(rec.clockIn);
-    var end = new Date(rec.clockOut);
-    if (toYMD(start) !== ymd || toYMD(end) !== ymd) return false;
-    if (!(end > start)) return false;
-    if (start.getHours() < 18 || end.getHours() < 18) return false;
-    var gross = end.getTime() - start.getTime();
-    if (gross > 3 * 3600000) return false;
-    rec.clockIn = new Date(
-      start.getFullYear(),
-      start.getMonth(),
-      start.getDate(),
-      DEFAULT_MORNING_H,
-      DEFAULT_MORNING_M,
-      0,
-      0
-    ).toISOString();
-    return true;
+    thisMon.setHours(0, 0, 0, 0);
+    return thisMon;
   }
 
   function formatHoursMinutes(ms) {
@@ -213,41 +181,6 @@
     var last = state.meta && state.meta.lastClockInAt;
     if (!last) return true;
     return now.getTime() >= nextUnlockAfterClockIn(last).getTime();
-  }
-
-  function runPrefillMigration(state) {
-    if (localStorage.getItem(MIGRATION_PREFILL_KEY)) return;
-    var thisMon = mondayOfSameWeek(new Date());
-    var lastMon = new Date(thisMon);
-    lastMon.setDate(thisMon.getDate() - 7);
-    var i;
-    for (i = 0; i < 5; i++) {
-      var d = new Date(lastMon);
-      d.setDate(lastMon.getDate() + i);
-      if (!isWeekday(d)) continue;
-      var ymd = toYMD(d);
-      if (!state.days[ymd]) state.days[ymd] = {};
-      if (!state.days[ymd].clockIn) {
-        var y = d.getFullYear();
-        var m = d.getMonth();
-        var dd = d.getDate();
-        state.days[ymd].clockIn = new Date(y, m, dd, 9, 40, 0, 0).toISOString();
-        state.days[ymd].clockOut = new Date(y, m, dd, 20, 59, 0, 0).toISOString();
-      }
-    }
-    var t = new Date();
-    var tymd = toYMD(t);
-    if (!state.days[tymd]) state.days[tymd] = {};
-    if (!state.days[tymd].clockIn) {
-      var inAt = new Date(t.getFullYear(), t.getMonth(), t.getDate(), 9, 21, 0, 0);
-      var inIso = inAt.toISOString();
-      state.days[tymd].clockIn = inIso;
-      state.days[tymd].punchedInAt = inIso;
-      if (!state.meta) state.meta = {};
-      state.meta.lastClockInAt = inIso;
-    }
-    localStorage.setItem(MIGRATION_PREFILL_KEY, "1");
-    saveState(state);
   }
 
   /** 从已有打卡补全 lastClockInAt：取 punchedInAt（真实点击）或 clockIn 中最晚一条 */
@@ -389,7 +322,6 @@
   var elCorrectIn = document.getElementById("correctIn");
   var elCorrectOut = document.getElementById("correctOut");
   var elBtnApplyCorrect = document.getElementById("btnApplyCorrect");
-  var elBtnQuickMorning921 = document.getElementById("btnQuickMorning921");
 
   function todayYMD() {
     return toYMD(new Date());
@@ -402,8 +334,6 @@
   function applyLocalBootstrap() {
     state = loadState();
     if (!state.meta) state.meta = {};
-    if (!cloudEnabled) runPrefillMigration(state);
-    if (fixEveningMisclickClockIn(state, new Date())) saveState(state);
     ensureLastClockInMeta(state);
     saveState(state);
   }
@@ -451,8 +381,7 @@
         }
         if (!state.meta) state.meta = {};
         ensureLastClockInMeta(state);
-        if (fixEveningMisclickClockIn(state, new Date())) saveState(state);
-        else saveState(state);
+        saveState(state);
         showMainUi();
       })
       .catch(function (e) {
@@ -663,27 +592,6 @@
         return;
       }
       applyTodayTimesFromHM(inHm || null, outHm || null);
-    });
-  }
-
-  if (elBtnQuickMorning921) {
-    elBtnQuickMorning921.addEventListener("click", function (e) {
-      if (e && e.preventDefault) e.preventDefault();
-      var ymd = todayYMD();
-      if (!state.days[ymd]) state.days[ymd] = {};
-      var rec = state.days[ymd];
-      var outHm =
-        (elCorrectOut && elCorrectOut.value) ||
-        (rec.clockOut ? hmFromIso(rec.clockOut) : "");
-      if (!outHm) {
-        alert("请先打下班卡，或在「下班」里填好时间后再点本按钮");
-        return;
-      }
-      var inHm =
-        pad2(DEFAULT_MORNING_H) + ":" + pad2(DEFAULT_MORNING_M);
-      if (elCorrectIn) elCorrectIn.value = inHm;
-      if (elCorrectOut) elCorrectOut.value = outHm;
-      applyTodayTimesFromHM(inHm, outHm);
     });
   }
 

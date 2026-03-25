@@ -82,9 +82,6 @@
                   <input type="time" id="correctOut" />
                 </label>
                 <button type="button" class="btn btn-secondary" id="btnApplyCorrect">保存时间</button>
-                <button type="button" class="btn btn-ghost" id="btnQuickMorning921">
-                  今日上班改为 9:21
-                </button>
               </div>
             </div>
           </section>
@@ -107,11 +104,11 @@
           <section class="card stats-card">
             <h2>本年按周</h2>
             <div class="stat-row">
-              <span class="stat-label">本年日均（按实际出勤天）</span>
+              <span class="stat-label">本年日均（本周起，按实际出勤天）</span>
               <span class="stat-value" id="yearWeekAvg">—</span>
             </div>
             <p class="hint">
-              自<strong>上周一</strong>起至<strong>本周</strong>：总工时 ÷
+              自<strong>本周一</strong>起：总工时 ÷
               <strong>所有「已完整打卡」的工作日天数</strong>（与本周分母规则相同）。下表「出勤天」为每周打卡天数，「周日均」=
               该周总工时 ÷ 该周出勤天。
             </p>
