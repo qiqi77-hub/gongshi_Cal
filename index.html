@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>工时计算器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div id="userBar" class="user-bar hidden">
+        <span class="user-email">已登录：<strong id="userEmail"></strong></span>
+        <button type="button" class="btn btn-ghost" id="btnLogout">退出登录</button>
+      </div>
+
+      <section id="authPanel" class="card auth-card hidden">
+        <h2>登录 / 注册</h2>
+        <p class="auth-hint">
+          配置 Firebase 后可多设备同步打卡数据。未配置时无需登录，数据仅在本机。
+        </p>
+        <div class="auth-fields">
+          <input type="email" id="authEmail" autocomplete="email" placeholder="邮箱" />
+          <input
+            type="password"
+            id="authPassword"
+            autocomplete="current-password"
+            placeholder="密码（至少 6 位）"
+          />
+        </div>
+        <div class="auth-actions">
+          <button type="button" class="btn btn-primary" id="btnAuthLogin">登录</button>
+          <button type="button" class="btn btn-secondary" id="btnAuthRegister">注册账号</button>
+        </div>
+        <p class="auth-error" id="authError" aria-live="polite"></p>
+      </section>
+
+      <div id="mainApp">
+        <header class="header">
+          <h1>工时计算器</h1>
+          <p class="subtitle">
+            上班打卡每日仅可打一次，次日 6:00 后可再打；下班可多次点击以更新时间。自动扣除午休 12:00–13:30（仅工作日统计）
+          </p>
+        </header>
+
+        <main class="main">
+          <section class="card punch-card">
+            <div class="date-line">
+              <span class="today-label" id="todayLabel"></span>
+            </div>
+            <div class="punch-times">
+              <div class="time-block">
+                <span class="time-label">上班</span>
+                <span class="time-value" id="clockInDisplay">—</span>
+              </div>
+              <div class="time-block">
+                <span class="time-label">下班</span>
+                <span class="time-value" id="clockOutDisplay">—</span>
+              </div>
+            </div>
+            <div class="today-meta" id="todayMeta"></div>
+            <div class="actions punch-actions">
+              <button type="button" class="btn btn-primary" id="btnClockIn">上班打卡</button>
+              <button type="button" class="btn btn-secondary" id="btnClockOut">下班打卡</button>
+            </div>
+            <div class="correct-wrap">
+              <p class="correct-hint">
+                若误点上班打卡，可在此改「实际上班时间」（显示与工时用）；不影响按真实点击时间的次日 6:00 解锁规则。
+              </p>
+              <div class="correct-row">
+                <label class="correct-field">
+                  <span>实际上班</span>
+                  <input type="time" id="correctIn" />
+                </label>
+                <label class="correct-field">
+                  <span>下班</span>
+                  <input type="time" id="correctOut" />
+                </label>
+                <button type="button" class="btn btn-secondary" id="btnApplyCorrect">保存时间</button>
+                <button type="button" class="btn btn-ghost" id="btnQuickMorning921">
+                  今日上班改为 9:21
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section class="card stats-card">
+            <h2>本周</h2>
+            <div class="stat-row">
+              <span class="stat-label">本周累计工时</span>
+              <span class="stat-value" id="weekTotal">—</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">本周日均</span>
+              <span class="stat-value" id="weekAvg">—</span>
+            </div>
+            <p class="hint">
+              日均 = 本周累计工时 ÷ <strong>本周已完整打卡的工作日数</strong>（有上班+下班）。未到的工作日、全天假不算进分母。
+            </p>
+          </section>
+
+          <section class="card stats-card">
+            <h2>本年按周</h2>
+            <div class="stat-row">
+              <span class="stat-label">本年日均（按实际出勤天）</span>
+              <span class="stat-value" id="yearWeekAvg">—</span>
+            </div>
+            <p class="hint">
+              自<strong>上周一</strong>起至<strong>本周</strong>：总工时 ÷
+              <strong>所有「已完整打卡」的工作日天数</strong>（与本周分母规则相同）。下表「出勤天」为每周打卡天数，「周日均」=
+              该周总工时 ÷ 该周出勤天。
+            </p>
+            <div class="year-weeks-wrap">
+              <table class="week-table" id="yearWeekTable">
+                <thead>
+                  <tr>
+                    <th>周</th>
+                    <th>区间</th>
+                    <th>总工时</th>
+                    <th>出勤天</th>
+                    <th>周日均</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card leave-card">
+            <h2>请假</h2>
+            <p class="hint">请假日从「有效工作日」分母中扣除；可随时销假。</p>
+            <div class="leave-form">
+              <label class="field">
+                <span>日期</span>
+                <input type="date" id="leaveDate" />
+              </label>
+              <label class="field">
+                <span>类型</span>
+                <select id="leaveType">
+                  <option value="full">全天</option>
+                  <option value="half">半天</option>
+                </select>
+              </label>
+              <div class="half-options hidden" id="halfOptions">
+                <label class="radio">
+                  <input type="radio" name="halfPart" value="morning" checked />
+                  上午假
+                </label>
+                <label class="radio">
+                  <input type="radio" name="halfPart" value="afternoon" />
+                  下午假
+                </label>
+              </div>
+              <button type="button" class="btn btn-primary" id="btnLeave">登记请假</button>
+            </div>
+            <h3 class="subheading">已登记请假</h3>
+            <ul class="leave-list" id="leaveList"></ul>
+          </section>
+        </main>
+
+        <footer class="footer" id="syncHint">数据保存在本机浏览器（localStorage）</footer>
+      </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script>
+      (function () {
+        var fc = window.firebaseConfig;
+        var useFb =
+          fc &&
+          fc.apiKey &&
+          String(fc.apiKey).length > 6 &&
+          fc.projectId &&
+          String(fc.projectId).length > 0;
+        var base = "https://www.gstatic.com/firebasejs/10.14.1/";
+        function loadAppJs() {
+          var a = document.createElement("script");
+          a.src = "app.js";
+          document.body.appendChild(a);
+        }
+        if (!useFb) {
+          loadAppJs();
+          return;
+        }
+        var urls = [
+          base + "firebase-app-compat.js",
+          base + "firebase-auth-compat.js",
+          base + "firebase-firestore-compat.js",
+        ];
+        var i = 0;
+        function next() {
+          if (i >= urls.length) {
+            loadAppJs();
+            return;
+          }
+          var s = document.createElement("script");
+          s.src = urls[i];
+          s.onload = function () {
+            i++;
+            next();
+          };
+          s.onerror = function () {
+            window.__firebaseCdnFailed = true;
+            console.warn("Firebase 脚本无法加载（如网络限制），已改用仅本机模式。");
+            loadAppJs();
+          };
+          document.body.appendChild(s);
+        }
+        next();
+      })();
+    </script>
+  </body>
+</html>
